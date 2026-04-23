@@ -369,8 +369,8 @@ def evaluate_model(model, x_test, y_test, labels=('cl', 'cd', 'cm')):
     labels = list(labels)
 
     test_loss, test_mae = model.evaluate(x_test, y_test, verbose=0)
-    print(f"Test MSE: {test_loss:.4f}")
-    print(f"Test MAE: {test_mae:.4f}")
+    print(f"Test Loss: {test_loss:.4f}")
+    print(f"Test MAE:  {test_mae:.4f}")
 
     y_pred = model.predict(x_test, verbose=0)
     y_true = y_test
@@ -406,7 +406,7 @@ def evaluate_model(model, x_test, y_test, labels=('cl', 'cd', 'cm')):
         axes[0, i].set_ylabel("Residual")
         axes[0, i].set_title(f"{name} residuals")
 
-        axes[1, i].hist(residuals, bins=15, edgecolor='k')
+        axes[1, i].hist(residuals, bins=7, edgecolor='k')
         axes[1, i].axvline(0, color='r', linestyle='--', linewidth=1)
         axes[1, i].set_xlabel("Residual")
         axes[1, i].set_ylabel("Count")
