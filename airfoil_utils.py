@@ -1,4 +1,6 @@
 import h5py
+import zipfile
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -14,6 +16,22 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
 # ── Data Loading ────────────────────────────────────────────────────────────────
+
+def unzip_airfoil_data(
+    zip_path='data/airfoil_1k_data_rng.zip',
+    extract_to='data/airfoil_1k_data_rng',
+):
+    """Extract the airfoil dataset zip file and return the output directory."""
+    zip_path = Path(zip_path).expanduser()
+    extract_to = Path(extract_to).expanduser()
+    extract_to.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        zf.extractall(extract_to)
+
+    print(f'Extracted {zip_path} to {extract_to}')
+    return extract_to
+
 
 def load_shape(data_path, key, use_dask=True, chunks=500):
     """Load a shape dataset ('landmarks', 'grassmann', 'cst', 'bezier')."""
