@@ -82,8 +82,6 @@ def create_airfoil_draw_widget(model, scales_np, n_mc=50):
     btn_right = widgets.Button(description='Right')
     btn_rotate_ccw = widgets.Button(description='Rot +5')
     btn_rotate_cw = widgets.Button(description='Rot -5')
-    btn_scale_up = widgets.Button(description='Bigger')
-    btn_scale_down = widgets.Button(description='Smaller')
     drawing = {'active': False}
 
     wind_indicator.value = """
@@ -189,53 +187,6 @@ def create_airfoil_draw_widget(model, scales_np, n_mc=50):
         refresh_angle_from_canvas()
         clear_prediction_output()
 
-    def resize_airfoil(scale_factor):
-        rgba = get_canvas_rgba()
-        gray = rgba[:, :, 0]
-        points_yx = np.argwhere(gray > 25)
-        if len(points_yx) < 20:
-            update_conditions()
-            clear_prediction_output()
-            return
-
-        y0, x0 = points_yx.min(axis=0)
-        y1, x1 = points_yx.max(axis=0) + 1
-        crop = rgba[y0:y1, x0:x1]
-        crop_h, crop_w = crop.shape[:2]
-        new_w = max(1, int(round(crop_w * scale_factor)))
-        new_h = max(1, int(round(crop_h * scale_factor)))
-
-        resized = Image.fromarray(crop, mode='RGBA').resize(
-            (new_w, new_h),
-            resample=Image.BICUBIC,
-        )
-
-        center_x = (x0 + x1) // 2
-        center_y = (y0 + y1) // 2
-        paste_x0 = center_x - new_w // 2
-        paste_y0 = center_y - new_h // 2
-        paste_x1 = paste_x0 + new_w
-        paste_y1 = paste_y0 + new_h
-
-        dst_x0 = max(0, paste_x0)
-        dst_y0 = max(0, paste_y0)
-        dst_x1 = min(CANVAS_W, paste_x1)
-        dst_y1 = min(CANVAS_H, paste_y1)
-        src_x0 = dst_x0 - paste_x0
-        src_y0 = dst_y0 - paste_y0
-        src_x1 = src_x0 + (dst_x1 - dst_x0)
-        src_y1 = src_y0 + (dst_y1 - dst_y0)
-
-        scaled = np.zeros_like(rgba)
-        scaled[:, :, 3] = 255
-        resized_rgba = np.array(resized, dtype=np.uint8)
-        if dst_x0 < dst_x1 and dst_y0 < dst_y1:
-            scaled[dst_y0:dst_y1, dst_x0:dst_x1] = resized_rgba[src_y0:src_y1, src_x0:src_x1]
-
-        set_canvas_rgba(scaled)
-        refresh_angle_from_canvas()
-        clear_prediction_output()
-
     def on_mouse_down(x, y):
         drawing['active'] = True
         canvas.begin_path()
@@ -331,26 +282,15 @@ def create_airfoil_draw_widget(model, scales_np, n_mc=50):
     btn_right.on_click(lambda _: shift_canvas(10, 0))
     btn_rotate_ccw.on_click(lambda _: rotate_canvas(5))
     btn_rotate_cw.on_click(lambda _: rotate_canvas(-5))
-    btn_scale_up.on_click(lambda _: resize_airfoil(1.1))
-    btn_scale_down.on_click(lambda _: resize_airfoil(0.9))
 
-    transform_controls = widgets.GridBox(
-        [
-            btn_left,
-            btn_right,
-            btn_up,
-            btn_down,
-            btn_rotate_cw,
-            btn_rotate_ccw,
-            btn_scale_down,
-            btn_scale_up,
-        ],
-        layout=widgets.Layout(
-            grid_template_columns='repeat(4, 90px)',
-            grid_template_rows='repeat(2, 32px)',
-            grid_gap='6px',
-        ),
-    )
+    transform_controls = widgets.HBox([
+        btn_left,
+        btn_right,
+        btn_up,
+        btn_down,
+        btn_rotate_cw,
+        btn_rotate_ccw,
+    ])
 
     clear_output(wait=True)
     display(conditions)
@@ -378,7 +318,5 @@ def create_airfoil_draw_widget(model, scales_np, n_mc=50):
         'btn_right': btn_right,
         'btn_rotate_ccw': btn_rotate_ccw,
         'btn_rotate_cw': btn_rotate_cw,
-        'btn_scale_up': btn_scale_up,
-        'btn_scale_down': btn_scale_down,
         'calculate_angle_of_attack': calculate_angle_of_attack,
     }
