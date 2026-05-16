@@ -20,6 +20,10 @@ MODEL_W, MODEL_H = 128, 128
 LABELS = ['Cl', 'Cd', 'Cm']
 FLOW_FIELD_NAMES = ('rho', 'rho_u', 'rho_v', 'e')
 
+# Module-level singleton: reuse the same Output widget across re-runs so that
+# re-executing the cell does not stack multiple live Output widgets in the cell.
+_WIDGET_OUTPUT = None
+
 
 def calculate_angle_of_attack(image_data, threshold=25, min_pixels=20):
     """
@@ -275,13 +279,21 @@ def create_airfoil_draw_widget(
         If True, flips the predicted field back vertically for the widget
         preview so the user can draw normally on the canvas.
     """
+    global _WIDGET_OUTPUT
     scales_np = np.asarray(scales_np, dtype=np.float32)
     flow_enabled = flow_model is not None and flow_y_mean is not None and flow_y_std is not None
 
     canvas = Canvas(width=CANVAS_W, height=CANVAS_H, sync_image_data=True)
     conditions = widgets.HTML()
     wind_indicator = widgets.HTML()
-    output = widgets.Output()
+
+    # Reuse the same Output widget across re-runs so old instances don't
+    # accumulate in the cell and cause the output to appear multiple times.
+    if _WIDGET_OUTPUT is None:
+        _WIDGET_OUTPUT = widgets.Output()
+    else:
+        _WIDGET_OUTPUT.clear_output(wait=True)
+    output = _WIDGET_OUTPUT
     btn_predict = widgets.Button(description='Predict', button_style='primary')
     btn_clear = widgets.Button(description='Clear')
     btn_up = widgets.Button(description='Up')
@@ -566,22 +578,6 @@ def create_airfoil_draw_widget(
         else:
             vmin, vmax = None, None
 
-        # flow_uri = _array_to_png_data_uri(
-        #     field,
-        #     cmap_name='viridis',
-        #     vmin=vmin,
-        #     vmax=vmax,
-        #     title=f'Predicted {field_name}',
-        #     origin='upper',
-        # )
-        # mask_uri = _array_to_png_data_uri(
-        #     flow['solid_mask'],
-        #     cmap_name='gray',
-        #     vmin=0,
-        #     vmax=1,
-        #     title='U-Net solid mask',
-        #     origin='upper',
-        # )
         flow_uri = _array_to_png_data_uri(
             field,
             cmap_name='viridis',
@@ -659,6 +655,17 @@ def create_airfoil_draw_widget(
 
     reset_canvas()
     update_conditions()
+
+    # Clear any pre-existing callbacks to prevent duplicates when the cell is re-run.
+    for _btn in (btn_predict, btn_clear, btn_up, btn_down, btn_left, btn_right,
+                 btn_rotate_ccw, btn_rotate_cw, btn_scale_up, btn_scale_down):
+        _btn._click_handlers.callbacks.clear()
+    line_width.unobserve_all()
+    flow_field_selector.unobserve_all()
+    canvas._mouse_down_callbacks.callbacks.clear()
+    canvas._mouse_move_callbacks.callbacks.clear()
+    canvas._mouse_up_callbacks.callbacks.clear()
+
     canvas.on_mouse_down(on_mouse_down)
     canvas.on_mouse_move(on_mouse_move)
     canvas.on_mouse_up(on_mouse_up)
