@@ -28,6 +28,8 @@ except Exception:
 
 CANVAS_W, CANVAS_H = 280, 280
 MODEL_W, MODEL_H = 128, 128
+EXAMPLES_DIR = "examples"
+MAX_PRESET_AIRFOILS = 3
 
 LABELS = ["Cl", "Cd", "Cm"]
 FLOW_FIELD_NAMES = ("rho", "rho_u", "rho_v", "e")
@@ -110,6 +112,63 @@ def make_editor_image(img):
     if not isinstance(img, Image.Image):
         img = Image.fromarray(np.asarray(img))
     return img.convert("RGBA")
+
+
+def list_example_airfoils():
+    if not os.path.isdir(EXAMPLES_DIR):
+        return []
+
+    filenames = [
+        name
+        for name in os.listdir(EXAMPLES_DIR)
+        if name.lower().endswith((".png", ".jpg", ".jpeg"))
+    ]
+
+    return sorted(filenames)[:MAX_PRESET_AIRFOILS]
+
+
+def example_airfoil_paths():
+    return [os.path.join(EXAMPLES_DIR, name) for name in list_example_airfoils()]
+
+
+def make_example_airfoil_preview(path):
+    img = Image.open(path).convert("RGBA")
+    w, h = img.size
+
+    crop_h = max(1, int(h * 0.80))
+
+    y_shift = -60
+    top = max(0, (h - crop_h) // 2 + y_shift)
+    bottom = min(h, top + crop_h)
+
+    preview = img.crop((0, 20, w, bottom))
+    thumb_w = 130
+    thumb_h = 55
+
+    preview = preview.resize((thumb_w, thumb_h), resample=Image.LANCZOS)
+
+    out = Image.new("RGBA", (CANVAS_W, 120), color=(0, 0, 0, 255))
+    out.paste(preview, ((CANVAS_W - thumb_w) // 2, (120 - thumb_h) // 2))
+    return out
+
+def example_airfoil_previews():
+    previews = []
+    for path in example_airfoil_paths():
+        try:
+            previews.append(make_example_airfoil_preview(path))
+        except Exception:
+            pass
+    return previews
+
+
+def load_example_airfoil_from_gallery(evt: gr.SelectData):
+    paths = example_airfoil_paths()
+    if evt.index is None or evt.index >= len(paths):
+        return make_editor_image(make_blank_canvas())
+
+    img = Image.open(paths[evt.index]).convert("RGBA")
+    img = img.resize((CANVAS_W, CANVAS_H), resample=Image.LANCZOS)
+    return make_editor_image(img)
 
 
 def transform_editor_image(editor_value, mode):
@@ -529,6 +588,17 @@ def build_app():
             flex: 0 0 105px;
             min-width: 105px;
         }
+        #preset-airfoil-gallery {
+            overflow: hidden;
+        }
+        #preset-airfoil-gallery .grid-wrap,
+        #preset-airfoil-gallery .grid-container,
+        #preset-airfoil-gallery .gallery {
+            overflow: hidden !important;
+        }
+        #preset-airfoil-gallery img {
+            object-fit: cover !important;
+        }
         """,
     ) as demo:
         gr.Markdown(
@@ -602,6 +672,17 @@ def build_app():
                 predict_btn = gr.Button("Predict", variant="primary")
                 clear_drawing_btn = gr.Button("Clear Drawing")
 
+                gr.Markdown("### Preset Airfoils")
+                preset_gallery = gr.Gallery(
+                    value=example_airfoil_previews(),
+                    label="Click an example to load it",
+                    columns=3,
+                    rows=1,
+                    height=145,
+                    object_fit="cover",
+                    allow_preview=False,
+                    elem_id="preset-airfoil-gallery",
+                )
 
                 gr.Markdown("### Transform Drawing")
                 with gr.Row():
@@ -681,9 +762,9 @@ def build_app():
                     Aerodynamic Coefficients
                   </div>
                   <ul style="margin:0;padding-left:18px;line-height:1.55;color:#374151">
-                    <li><b>C<sub>d</sub></b>: representing the coefficient of drag for each airfoil geometry at the specified angle of attack.</li>
-                    <li><b>C<sub>l</sub></b>: representing the coefficient of lift for each airfoil geometry at the specified angle of attack.</li>
-                    <li><b>C<sub>m</sub></b>: representing the coefficient of moment for each airfoil geometry at the specified angle of attack.</li>
+                    <li><b>C<sub>d</sub></b>: representing the coefficient of drag for each airfoil geometry.</li>
+                    <li><b>C<sub>l</sub></b>: representing the coefficient of lift for each airfoil geometry.</li>
+                    <li><b>C<sub>m</sub></b>: representing the coefficient of moment for each airfoil geometry.</li>
                   </ul>
                 </div>
                 <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px">
@@ -705,6 +786,10 @@ def build_app():
         clear_drawing_btn.click(
             fn=lambda current: transform_editor_image(current, "clear"),
             inputs=[sketch],
+            outputs=[sketch],
+        )
+        preset_gallery.select(
+            fn=load_example_airfoil_from_gallery,
             outputs=[sketch],
         )
         left_btn.click(
